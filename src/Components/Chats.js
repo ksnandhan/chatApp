@@ -12,11 +12,14 @@ import { connect } from 'react-redux';
 import { MdGroups } from "react-icons/md";
 import { IoPersonSharp } from "react-icons/io5";
 import { FaUserGroup } from "react-icons/fa6";
+import { IoSend } from "react-icons/io5";
  import './Chats.css'
  import AddGroup from './AddGroup';
 
  var socket; 
- var cUser = ""; 
+ var cUser = "";
+ var cType = "";  
+ var thisname;
 
  const Chats = () => {
    const [isConnected, setIsConnected] = useState(false);
@@ -57,12 +60,16 @@ import { FaUserGroup } from "react-icons/fa6";
 
          responseData.response.users.map(
           (user) => {
-            setPeople((prevPeople) => [...prevPeople, user.userName])
+           setPeople((prevPeople) => [...prevPeople, [user.userName, "private"]])
           });
 
          responseData.response.groups.map(
           (user) => {
-            setNewGroup((prevPeople) => [...prevPeople, user.groupName])
+            var isPart = false; 
+             user.userName.map((one) => {
+                if(one == thisname) isPart = true; 
+             })
+            if(isPart) setNewGroup((prevPeople) => [...prevPeople, [user.groupName, "group"]])
           });
         // console.log(usernames);
        })
@@ -75,6 +82,10 @@ import { FaUserGroup } from "react-icons/fa6";
      setRel(!rel);
    };
 
+   const goBack = () =>{
+      setSetGroup(false); 
+   }
+
    var props = {
      members: ["shiva", "chetan", "nidhi"],
      chatRows: [<span> Hey man, {name}</span>],
@@ -85,10 +96,15 @@ import { FaUserGroup } from "react-icons/fa6";
    };
 
     
-   const connectUser =  () => {
+   const connectUser = async () => {
      var user = prompt("enter your name");
-     setName(user);
+     if(user == "") {alert("username cannot be empty");  return;  }
 
+  
+     setName(user);
+     thisname = user; 
+
+     if(user == null){alert("username cannot be empty!");  window.location.reload(); }
       socket =  new WebSocket(
        `wss://b8evzwmhe0.execute-api.us-east-1.amazonaws.com/production/?userName=${user}`
      );
@@ -117,7 +133,10 @@ import { FaUserGroup } from "react-icons/fa6";
       
       
  
-        if(data.from == cUser) setNewRows((prevRows) => [...prevRows, [data.from, name ,data.from + ": " + data.message]])
+        if(data.from == cUser && data.Type == "private") setNewRows((prevRows) => [...prevRows, [data.from, name ,data.from + ": " + data.message]])
+
+        if(data.to == cUser && data.Type == "group" && data.from != thisname) 
+        setNewRows((prevRows) => [...prevRows, [data.from, name, data.from + ": " +data.message]])
 
         console.log(cUser); 
         console.log(data);
@@ -136,8 +155,9 @@ import { FaUserGroup } from "react-icons/fa6";
       const messageObject = {
         action: "sendmessage",
         message: message,
-        to: currentUser,
+        to: cUser,
         from: name,
+        Type: cType
       };
       
       const jsonMessage = JSON.stringify(messageObject);
@@ -169,14 +189,19 @@ import { FaUserGroup } from "react-icons/fa6";
       return data; 
     }).then((response) =>{
      const responseData = JSON.parse(response.body);
+     console.log(responseData); 
      setNewRows([]); 
      responseData.messages.map(
        (rowss) => {
-         if((rowss.to == currentUser && rowss.from == name) ) 
+         if((rowss.to == currentUser && rowss.from == name ) ) 
          setNewRows((prevRows) => [...prevRows,[rowss.from, rowss.to, "You: " + rowss.message ]])
         
-        if(rowss.to == name && rowss.from == currentUser)
+        if(rowss.to == name && rowss.from == currentUser && rowss.Type == "private")
         setNewRows((prevRows) => [...prevRows,[rowss.from, rowss.to, rowss.from + ": "+ rowss.message ]])
+      
+      if(rowss.to == cUser && rowss.Type == "group" && rowss.from != thisname)
+      setNewRows((prevRows) => [...prevRows,[rowss.from, rowss.to, rowss.from + ": "+ rowss.message ]])
+
 
        
        });
@@ -195,12 +220,18 @@ import { FaUserGroup } from "react-icons/fa6";
    
 
    const disconnectUser = () => {
-     setName("");
-     setIsConnected(false);
+    //  setName("");
+    //  setIsConnected(false);
+     window.location.reload(); 
+
      
    };
 
    return (
+      <>
+      {isConnected && setGroup && 
+      <div style = {{textAlign: "center"}}> <br/> <br/> <AddGroup user={thisname} goBack = {goBack}/> <br/></div>}
+      {!setGroup && 
      <div
        style={{
          position: "absolute",
@@ -214,28 +245,27 @@ import { FaUserGroup } from "react-icons/fa6";
        <CssBaseline />
        <Container maxWidth="lg" style={{ height: "90%"}}>
          <Grid container style={{ height: "100%", background: "black"  }}>
-           <Grid
-             item
-             xs={2}
+           <Grid item xs={2}
              style={{ backgroundColor: "#008000", color: "white",  }}
            >
-             <List component="nav">
+             <div component="nav" style ={{height: "628px", overflowY: "auto", scrollbarColor: "green"}}>
                <button onClick={Reload} className='button-3'> <TfiReload/></button>
 
                {isConnected && people.map((item, i) => (
 
-                (item != name && <ListItem key = {i}
-                  style = {{background: (currentUser==item) ? "#138845" : "none"}}
+                (item[0] != name && <ListItem key = {i}
+                  style = {{background: (currentUser==item[0]) ? "#138845" : "none"}}
                   onClick={() => {
-                    setCurrentUser(item);
-                    cUser = item; 
-                    localStorage.setItem("currentUser", item); 
+                    setCurrentUser(item[0]);
+                    cUser = item[0]; 
+                    cType = item[1]; 
+                    localStorage.setItem("currentUser", item[0]); 
                     getMessages(); 
                   }}
                  
                   button
                 >
-                 <div ><IoPersonSharp/> <ListItemText style={{ fontWeight: 800, paddingLeft:"5px", paddingTop:"3px", display: "inline-block" }} primary={item} /></div> 
+                 <div ><IoPersonSharp/> <ListItemText style={{ fontWeight: 800, paddingLeft:"5px", paddingTop:"3px", display: "inline-block" }} primary={item[0]} /></div> 
                 </ListItem> 
                 )
                 
@@ -245,24 +275,25 @@ import { FaUserGroup } from "react-icons/fa6";
                {isConnected && newGroup.map((item, i) => (
 
               (item != name && <ListItem key = {i} 
-              style = {{background: (currentUser==item) ? "#138845" : "none"}}
+              style = {{background: (currentUser==item[0]) ? "#138845" : "none"}}
               onClick={() => {
-                   setCurrentUser(item);
-                   cUser = item; 
-                   localStorage.setItem("currentUser", item); 
+                   setCurrentUser(item[0]);
+                   cUser = item[0];
+                   cType = item[1];  
+                   localStorage.setItem("currentUser", item[0]); 
                    getMessages(); 
               }}
  
                  button
               >
-              <div ><FaUserGroup/> <ListItemText style={{ fontWeight: 800, paddingLeft:"5px", paddingTop:"1px", display: "inline-block" }} primary={item} /></div> 
+              <div ><FaUserGroup/> <ListItemText style={{ fontWeight: 800, paddingLeft:"5px", paddingTop:"1px", display: "inline-block" }} primary={item[0]} /></div> 
               </ListItem> 
               )
 
 ))   
 }
 
-             </List>
+             </div>
            </Grid>
            <Grid
              style={{ position: "relative" }}
@@ -300,9 +331,9 @@ import { FaUserGroup } from "react-icons/fa6";
                  <Grid item style={{ margin: 10 }}>
                    {isConnected && (
                      <>
-                       <input type="text" style={{display: "inline-block", marginBottom: "20px"}} 
-                       onChange={e => setMessage(e.target.value)}/> <button className='button-6'
-                       onClick = { sendMessage}>Send</button>
+                       <input type="text" style={{display: "inline-block", marginBottom: "16px"}} 
+                       onChange={e => setMessage(e.target.value)}/> <button className='button-7'
+                       onClick = {sendMessage}> <IoSend style = {{marginBottom: "3px", marginTop: "-2px", width: "30px"}}/>  </button>
                      </>
                    )}
                    
@@ -355,6 +386,9 @@ import { FaUserGroup } from "react-icons/fa6";
          </Grid>
        </Container>
      </div>
+ }
+     </>
+     
    );
  };
 
